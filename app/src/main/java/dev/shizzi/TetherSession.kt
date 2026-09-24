@@ -242,8 +242,8 @@ class TetherSession(private val context: Context) {
 
     private companion object {
         const val TAG = "TetherSession"
-        const val TUN_ADDRESS = "192.0.2.2"
-        const val TUN_PREFIX_LENGTH = 24
+        const val TUN_ADDRESS = "192.168.0.2"
+        const val TUN_PREFIX_LENGTH = 16
 
         const val TUN_ADDRESS_V6 = "2001:db8::2"
         const val TUN_PREFIX_LENGTH_V6 = 64

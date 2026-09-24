@@ -30,6 +30,7 @@ class TetherSession(private val context: Context) {
     fun start(
         mode: VpnMode = VpnMode.AUTO,
         range: HotspotRange = HotspotRange.PRIVATE_172,
+        customSubnet: String = "172.16.0.0/24",
     ): String {
         if (isActive) return status()
 
@@ -38,7 +39,7 @@ class TetherSession(private val context: Context) {
         state = SessionState.STARTING
         SessionLog.info(
             "session start requested (vpn mode ${mode.name.lowercase()}, " +
-                "hotspot range ${range.name.lowercase()})",
+                "hotspot range ${range.name.lowercase()}, custom subnet $customSubnet)",
         )
 
         SessionLog.info(
@@ -47,7 +48,7 @@ class TetherSession(private val context: Context) {
                 "contract ${TetherService.CONTRACT_VERSION}",
         )
 
-        return runCatching { bringUp() }
+        return runCatching { bringUp(customSubnet) }
             .getOrElse { failure ->
                 Log.e(TAG, "start failed", failure)
                 SessionLog.error(
@@ -60,11 +61,11 @@ class TetherSession(private val context: Context) {
             }
     }
 
-    private fun bringUp(): String {
+    private fun bringUp(customSubnet: String): String {
         val group = SessionResources(testNetworkApi, context.connectivityManager())
         resources = group
 
-        val addresses = tunAddresses(hotspotRange)
+        val addresses = tunAddresses(hotspotRange, customSubnet)
         val name = group.acquire(addresses, TEST_NETWORK_DNS_SERVERS, AVAILABILITY_TIMEOUT_MS)
         interfaceName = name
         SessionLog.info("tun up: $name (mtu $TUN_MTU, addresses=$addresses)")
@@ -250,7 +251,7 @@ class TetherSession(private val context: Context) {
         return vpn.isVpnPresent()
     }
 
-    private fun tunAddresses(range: HotspotRange) = buildList {
+    private fun tunAddresses(range: HotspotRange, customSubnet: String) = buildList {
         // Keep Shizzi's documentation-range address as the real userspace datapath address.
         add(buildLinkAddress(java.net.InetAddress.getByName(TUN_ADDRESS), TUN_PREFIX_LENGTH))
 
@@ -258,9 +259,6 @@ class TetherSession(private val context: Context) {
         // sees them as upstream prefixes and skips the corresponding downstream address pools.
         when (range) {
             HotspotRange.DEFAULT_192 -> {
-                // Force selection from 192.168/16 by making the other private pools
-                // appear occupied. Android can still avoid the real upstream /24
-                // (for example 192.168.1.0/24) and choose another 192.168.x.0/24.
                 add(buildLinkAddress(java.net.InetAddress.getByName(BLOCK_172_ADDRESS), 12))
                 add(buildLinkAddress(java.net.InetAddress.getByName(BLOCK_10_ADDRESS), 8))
             }
@@ -271,6 +269,13 @@ class TetherSession(private val context: Context) {
             HotspotRange.PRIVATE_10 -> {
                 add(buildLinkAddress(java.net.InetAddress.getByName(BLOCK_192_ADDRESS), 16))
                 add(buildLinkAddress(java.net.InetAddress.getByName(BLOCK_172_ADDRESS), 12))
+            }
+            HotspotRange.CUSTOM -> {
+                val subnet = HotspotSubnet.parse(customSubnet)
+                SessionLog.info("forcing exact hotspot subnet: ${subnet.cidr}")
+                subnet.conflictMarkers().forEach { (address, prefix) ->
+                    add(buildLinkAddress(java.net.InetAddress.getByName(address), prefix))
+                }
             }
         }
 

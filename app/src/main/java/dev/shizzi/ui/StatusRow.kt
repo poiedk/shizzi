@@ -59,6 +59,17 @@ fun StatusRow(
         StatusLabel(statusWord(state.status))
 
         AnimatedVisibility(
+            visible = hasHotspotAddress(state),
+            enter = fadeIn(standardTween()) + expandHorizontally(standardTween()),
+            exit = fadeOut(standardTween()) + shrinkHorizontally(standardTween()),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                StatusDivider()
+                StatusText(state.hotspotAddress)
+            }
+        }
+
+        AnimatedVisibility(
             visible = hasTunnel(state),
             enter = fadeIn(standardTween()) + expandHorizontally(standardTween()),
             exit = fadeOut(standardTween()) + shrinkHorizontally(standardTween()),
@@ -83,6 +94,9 @@ private fun StatusText(text: String) {
         textAlign = TextAlign.Center,
     )
 }
+
+private fun hasHotspotAddress(state: SessionUiState): Boolean =
+    state.status == UiStatus.CONNECTED && state.hotspotAddress.isNotEmpty()
 
 private fun hasTunnel(state: SessionUiState): Boolean =
     state.status == UiStatus.CONNECTED && state.interfaceName.isNotEmpty()

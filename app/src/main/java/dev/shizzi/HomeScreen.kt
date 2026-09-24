@@ -44,6 +44,7 @@ data class AppActions(
     val onSetLogging: (Boolean) -> Unit,
     val onSetVpnMode: (VpnMode) -> Unit,
     val onSetHotspotRange: (HotspotRange) -> Unit,
+    val onSetHotspotSubnet: (String) -> Unit,
     val onRunProbes: () -> Unit,
     val onDismissDiagnostics: () -> Unit,
     val onClearLog: (onCleared: (String?) -> Unit) -> Unit,
@@ -155,6 +156,7 @@ private fun settingsState(state: AppState): SettingsState {
         isLogging = settings.isLogging,
         vpnMode = settings.vpnMode,
         hotspotRange = settings.hotspotRange,
+        hotspotSubnet = settings.hotspotSubnet,
         isRunningDiagnostics = state.diagnostics is DiagnosticsState.Running,
         automation = AutomationState(
             isEnabled = settings.isAutomationEnabled,
@@ -174,6 +176,7 @@ private fun settingsActions(context: ScreenContext): SettingsActions {
         onSetLogging = actions.onSetLogging,
         onSetVpnMode = actions.onSetVpnMode,
         onSetHotspotRange = actions.onSetHotspotRange,
+        onSetHotspotSubnet = actions.onSetHotspotSubnet,
         onOpenLog = { context.navigation.open(Screen.LOG) },
         onRunProbes = actions.onRunProbes,
         onGrantPermission = actions.onGrantPermission,

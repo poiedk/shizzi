@@ -27,6 +27,7 @@ data class Settings(
 
     val vpnMode: VpnMode = VpnMode.AUTO,
     val hotspotRange: HotspotRange = HotspotRange.PRIVATE_172,
+    val hotspotSubnet: String = "172.16.0.0/24",
 
     val hasCompletedOnboarding: Boolean = false,
 
@@ -84,6 +85,10 @@ class SettingsStore(private val context: Context) {
         context.dataStore.edit { it[HOTSPOT_RANGE] = range.name }
     }
 
+    suspend fun setHotspotSubnet(subnet: String) {
+        context.dataStore.edit { it[HOTSPOT_SUBNET] = subnet }
+    }
+
     suspend fun setOnboardingComplete(hasCompleted: Boolean) {
         context.dataStore.edit { it[ONBOARDED] = hasCompleted }
     }
@@ -114,6 +119,7 @@ internal val CUSTOM_ACCENTS = stringPreferencesKey("custom_accents")
 internal val LOGGING = booleanPreferencesKey("logging")
 internal val VPN_MODE = stringPreferencesKey("vpn_mode")
 internal val HOTSPOT_RANGE = stringPreferencesKey("hotspot_range")
+internal val HOTSPOT_SUBNET = stringPreferencesKey("hotspot_subnet")
 internal val ONBOARDED = booleanPreferencesKey("onboarded")
 internal val AUTOMATION = booleanPreferencesKey("automation")
 internal val AUTOMATION_TOKEN = stringPreferencesKey("automation_token")
@@ -128,6 +134,7 @@ internal fun toSettings(preferences: Preferences) = Settings(
     isLogging = preferences[LOGGING] ?: true,
     vpnMode = parseVpnMode(preferences[VPN_MODE]),
     hotspotRange = parseHotspotRange(preferences[HOTSPOT_RANGE]),
+    hotspotSubnet = preferences[HOTSPOT_SUBNET] ?: "172.16.0.0/24",
     hasCompletedOnboarding = preferences[ONBOARDED] ?: false,
     isAutomationEnabled = preferences[AUTOMATION] ?: false,
     automationToken = preferences[AUTOMATION_TOKEN].orEmpty(),

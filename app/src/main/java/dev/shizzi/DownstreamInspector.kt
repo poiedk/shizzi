@@ -22,6 +22,17 @@ class DownstreamInspector(private val inspector: UpstreamInspector = UpstreamIns
         }
     }
 
+    fun ipv4Address(): String? {
+        val observation = inspector.observe()
+        if (observation.didTimeout) return null
+
+        val downstreamBlock = observation.rawOutput
+            .substringAfter("mDownstreams:", missingDelimiterValue = "")
+            .substringBefore("mCachedAddresses:", missingDelimiterValue = "")
+
+        return IPV4_PREFIX_PATTERN.find(downstreamBlock)?.groupValues?.get(1)
+    }
+
     fun countDevices(): Int {
         val now = System.currentTimeMillis()
         if (now - lastReadAt < REFRESH_INTERVAL_MS) return cachedCount
@@ -56,6 +67,9 @@ class DownstreamInspector(private val inspector: UpstreamInspector = UpstreamIns
 
         private val CONNECTED_CLIENTS_PATTERN =
             Regex("""getConnectedClientList\(\)\.size\(\):\s*(\d+)""")
+
+        private val IPV4_PREFIX_PATTERN =
+            Regex("""\b((?:10|172|192)\.\d{1,3}\.\d{1,3}\.\d{1,3}/\d{1,2})\b""")
 
         private const val REFRESH_INTERVAL_MS = 10_000L
     }

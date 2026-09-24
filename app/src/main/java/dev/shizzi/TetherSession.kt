@@ -242,6 +242,7 @@ class TetherSession(private val context: Context) {
 
     private companion object {
         const val TAG = "TetherSession"
+        // Deliberately overlap 192.168/16 so Android tethering falls back to the next private pool.
         const val TUN_ADDRESS = "192.168.0.2"
         const val TUN_PREFIX_LENGTH = 16
 

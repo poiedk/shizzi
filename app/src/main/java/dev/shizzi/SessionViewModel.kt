@@ -110,6 +110,10 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch { settingsStore.setHotspotRange(range) }
     }
 
+    fun setHotspotSubnet(subnet: String) {
+        viewModelScope.launch { settingsStore.setHotspotSubnet(subnet) }
+    }
+
     fun setTheme(choice: ThemeChoice) {
         viewModelScope.launch { settingsStore.setTheme(choice) }
     }

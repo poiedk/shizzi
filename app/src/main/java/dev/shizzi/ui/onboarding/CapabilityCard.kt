@@ -107,6 +107,8 @@ private fun StatusMark(status: CapabilityStatus) {
 private fun titleFor(capability: Capability): String = when (capability) {
     Capability.TEST_NETWORK -> "Test network API"
     Capability.PREFER_TEST_NETWORKS -> "Prefer test networks"
+    Capability.NETWORK_STACK_BINDER -> "NetworkStack Binder"
+    Capability.NETWORK_STACK_PERMISSION -> "NetworkStack permission"
 }
 
 private fun descriptionFor(capability: Capability): String = when (capability) {
@@ -117,4 +119,10 @@ private fun descriptionFor(capability: Capability): String = when (capability) {
     Capability.PREFER_TEST_NETWORKS ->
         "Lets the app route the hotspot through the test network tunnel. " +
             "Added in Android 13."
+
+    Capability.NETWORK_STACK_BINDER ->
+        "Checks whether the Android network_stack Binder service is present."
+
+    Capability.NETWORK_STACK_PERMISSION ->
+        "Checks whether the Shizuku shell process holds android.permission.NETWORK_STACK."
 }

@@ -26,10 +26,19 @@ class TetherService : ITetherService.Stub {
 
     override fun getContractVersion(): Int = CONTRACT_VERSION
 
-    override fun start(logging: Boolean, vpnMode: String?, hotspotRange: String?): String {
+    override fun start(
+        logging: Boolean,
+        vpnMode: String?,
+        hotspotRange: String?,
+        hotspotSubnet: String?,
+    ): String {
         SessionLog.setEnabled(logging)
         return runCatching {
-            session.start(parseVpnMode(vpnMode), parseHotspotRange(hotspotRange))
+            session.start(
+                parseVpnMode(vpnMode),
+                parseHotspotRange(hotspotRange),
+                hotspotSubnet.orEmpty(),
+            )
         }.getOrElse { failure -> sessionError("start", failure) }
     }
 

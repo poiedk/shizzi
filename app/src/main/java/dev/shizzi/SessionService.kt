@@ -86,7 +86,13 @@ class SessionService : Service() {
             val outcome = sessionLock.withLock {
                 if (attempt != generation) return@launch
                 runCatching {
-                    controller.start(\n                        settings.isLogging,\n                        settings.vpnMode,\n                        settings.hotspotRange,\n                        settings.hotspotSubnet,\n                    )\n                }
+                    controller.start(
+                        settings.isLogging,
+                        settings.vpnMode,
+                        settings.hotspotRange,
+                        settings.hotspotSubnet,
+                    )
+                }
             }
             if (attempt != generation) return@launch
 

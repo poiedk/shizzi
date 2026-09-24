@@ -257,9 +257,16 @@ class TetherSession(private val context: Context) {
         // Extra addresses are deliberate conflict markers. Android's PrivateAddressCoordinator
         // sees them as upstream prefixes and skips the corresponding downstream address pools.
         when (range) {
-            HotspotRange.DEFAULT_192 -> Unit
+            HotspotRange.DEFAULT_192 -> {
+                // Force selection from 192.168/16 by making the other private pools
+                // appear occupied. Android can still avoid the real upstream /24
+                // (for example 192.168.1.0/24) and choose another 192.168.x.0/24.
+                add(buildLinkAddress(java.net.InetAddress.getByName(BLOCK_172_ADDRESS), 12))
+                add(buildLinkAddress(java.net.InetAddress.getByName(BLOCK_10_ADDRESS), 8))
+            }
             HotspotRange.PRIVATE_172 -> {
                 add(buildLinkAddress(java.net.InetAddress.getByName(BLOCK_192_ADDRESS), 16))
+                add(buildLinkAddress(java.net.InetAddress.getByName(BLOCK_10_ADDRESS), 8))
             }
             HotspotRange.PRIVATE_10 -> {
                 add(buildLinkAddress(java.net.InetAddress.getByName(BLOCK_192_ADDRESS), 16))
@@ -277,6 +284,7 @@ class TetherSession(private val context: Context) {
 
         const val BLOCK_192_ADDRESS = "192.168.0.2"
         const val BLOCK_172_ADDRESS = "172.16.0.2"
+        const val BLOCK_10_ADDRESS = "10.0.0.2"
 
         const val TUN_ADDRESS_V6 = "2001:db8::2"
         const val TUN_PREFIX_LENGTH_V6 = 64

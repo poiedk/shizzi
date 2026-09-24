@@ -81,7 +81,12 @@ class TetherSession(private val context: Context) {
 
         state = SessionState.ACTIVE
         activeSince = System.currentTimeMillis()
-        detail = "tethered clients routing through $name"
+        val hotspotAddress = downstream.ipv4Address()
+        detail = when (hotspotAddress) {
+            null -> "tethered clients routing through $name"
+            else -> "hotspot $hotspotAddress routing through $name"
+        }
+        hotspotAddress?.let { SessionLog.info("hotspot address: $it") }
 
         teardown.installShutdownHook()
         startWatchdog(name)
@@ -235,6 +240,7 @@ class TetherSession(private val context: Context) {
         put("bytesUp", traffic.up)
         put("bytesDown", traffic.down)
         put("clientCount", if (isActive) downstream.countDevices() else 0)
+        put("hotspotAddress", if (isActive) downstream.ipv4Address() ?: JSONObject.NULL else JSONObject.NULL)
     }.toString()
 
     private fun isVpnBypassed(): Boolean {

@@ -13,6 +13,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -51,36 +52,41 @@ fun StatusRow(
     onVersionClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(
+    Column(
         modifier = modifier.fillMaxWidth().padding(ScreenPadding),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(ShizziTheme.spacing.xs),
     ) {
-        StatusLabel(statusWord(state.status))
-
-        AnimatedVisibility(
-            visible = hasHotspotAddress(state),
-            enter = fadeIn(standardTween()) + expandHorizontally(standardTween()),
-            exit = fadeOut(standardTween()) + shrinkHorizontally(standardTween()),
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                StatusDivider()
-                StatusText(state.hotspotAddress)
+            StatusLabel(statusWord(state.status))
+
+            AnimatedVisibility(
+                visible = hasHotspotAddress(state),
+                enter = fadeIn(standardTween()) + expandHorizontally(standardTween()),
+                exit = fadeOut(standardTween()) + shrinkHorizontally(standardTween()),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    StatusDivider()
+                    StatusText(state.hotspotAddress)
+                }
+            }
+
+            AnimatedVisibility(
+                visible = hasTunnel(state),
+                enter = fadeIn(standardTween()) + expandHorizontally(standardTween()),
+                exit = fadeOut(standardTween()) + shrinkHorizontally(standardTween()),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    StatusDivider()
+                    TunnelSegment(state.interfaceName)
+                }
             }
         }
 
-        AnimatedVisibility(
-            visible = hasTunnel(state),
-            enter = fadeIn(standardTween()) + expandHorizontally(standardTween()),
-            exit = fadeOut(standardTween()) + shrinkHorizontally(standardTween()),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                StatusDivider()
-                TunnelSegment(state.interfaceName)
-            }
-        }
-
-        StatusDivider()
         VersionSegment(onReveal = onVersionClick)
     }
 }

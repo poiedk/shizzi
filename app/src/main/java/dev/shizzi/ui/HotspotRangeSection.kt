@@ -42,7 +42,12 @@ private fun hotspotRangeDescription(range: HotspotRange): String = when (range) 
 }
 
 @Composable
-fun HotspotRangeSection(\n    selected: HotspotRange,\n    customSubnet: String,\n    onSelect: (HotspotRange) -> Unit,\n    onSetCustomSubnet: (String) -> Unit,\n) {
+fun HotspotRangeSection(
+    selected: HotspotRange,
+    customSubnet: String,
+    onSelect: (HotspotRange) -> Unit,
+    onSetCustomSubnet: (String) -> Unit,
+) {
     var isOpen by remember { mutableStateOf(false) }
     var draftSubnet by remember(customSubnet) { mutableStateOf(customSubnet) }
 

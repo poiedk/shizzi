@@ -70,7 +70,11 @@ fun HotspotRangeSection(\n    selected: HotspotRange,\n    customSubnet: String,
                     .fillMaxWidth()
                     .clickable {
                         onSelect(range)
-                        isOpen = false
+                        if (range == HotspotRange.CUSTOM) {
+                            draftSubnet = customSubnet
+                        } else {
+                            isOpen = false
+                        }
                     }
                     .padding(vertical = ShizziTheme.spacing.md),
                 verticalAlignment = Alignment.CenterVertically,

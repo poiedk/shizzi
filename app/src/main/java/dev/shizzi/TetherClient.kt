@@ -26,6 +26,7 @@ data class SessionUiState(
     val isVpnBypassed: Boolean = false,
 
     val clientCount: Int = 0,
+    val hotspotAddress: String = "",
 
     val traffic: Traffic = Traffic(),
 ) {
@@ -42,6 +43,7 @@ fun SessionUiState.asStopped(): SessionUiState = copy(
     isVpnBound = false,
     isVpnBypassed = false,
     clientCount = 0,
+    hotspotAddress = "",
     traffic = Traffic(),
 )
 
@@ -57,6 +59,7 @@ fun SessionUiState.applyOutcome(outcome: Result<String>): SessionUiState {
             isVpnBound = false,
             isVpnBypassed = false,
             clientCount = 0,
+            hotspotAddress = "",
             traffic = Traffic(),
         )
     }
@@ -75,6 +78,8 @@ fun SessionUiState.applyOutcome(outcome: Result<String>): SessionUiState {
         isVpnBound = parsed?.optBoolean("isVpnBound") == true,
         isVpnBypassed = parsed?.optBoolean("isVpnBypassed") == true,
         clientCount = parsed?.optInt("clientCount") ?: 0,
+        hotspotAddress = parsed?.optString("hotspotAddress").orEmpty()
+            .takeIf { it != "null" }.orEmpty(),
         traffic = Traffic(
             up = parsed?.optLong("bytesUp") ?: 0,
             down = parsed?.optLong("bytesDown") ?: 0,

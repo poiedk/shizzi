@@ -40,7 +40,8 @@ sealed interface CompatibilityState {
 }
 
 val CompatibilityState.isCompatible: Boolean
-    get() = this is CompatibilityState.Complete && results.all { it.isPresent }
+    get() = this is CompatibilityState.Complete &&
+        REQUIRED_CAPABILITIES.all { required -> results.isPresent(required) }
 
 val CompatibilityState.isOnFixPath: Boolean
     get() = this is CompatibilityState.Fixable ||
@@ -74,3 +75,9 @@ fun List<CapabilityResult>.isFixableByModuleInstall(): Boolean {
 
 private fun List<CapabilityResult>.isPresent(capability: Capability): Boolean =
     firstOrNull { it.capability == capability }?.isPresent == true
+
+
+private val REQUIRED_CAPABILITIES = setOf(
+    Capability.TEST_NETWORK,
+    Capability.PREFER_TEST_NETWORKS,
+)

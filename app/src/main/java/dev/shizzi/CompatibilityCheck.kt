@@ -3,7 +3,12 @@ package dev.shizzi
 import android.content.Context
 import org.json.JSONObject
 
-enum class Capability { TEST_NETWORK, PREFER_TEST_NETWORKS }
+enum class Capability {
+    TEST_NETWORK,
+    PREFER_TEST_NETWORKS,
+    NETWORK_STACK_BINDER,
+    NETWORK_STACK_PERMISSION,
+}
 
 data class CapabilityResult(
     val capability: Capability,
@@ -17,6 +22,8 @@ class CompatibilityCheck(private val context: Context) {
         when (capability) {
             Capability.TEST_NETWORK -> checkTestNetwork()
             Capability.PREFER_TEST_NETWORKS -> checkPreferTestNetworks()
+            Capability.NETWORK_STACK_BINDER -> checkNetworkStackBinder()
+            Capability.NETWORK_STACK_PERMISSION -> checkNetworkStackPermission()
         }
     }
 
@@ -40,6 +47,46 @@ class CompatibilityCheck(private val context: Context) {
             capability = Capability.PREFER_TEST_NETWORKS,
             isPresent = failure == null,
             detail = failure ?: "TetheringManager.setPreferTestNetworks resolved",
+        )
+    }
+
+    private fun checkNetworkStackBinder(): CapabilityResult {
+        val outcome = runCatching {
+            val serviceManager = Class.forName("android.os.ServiceManager")
+            val getService = serviceManager.getMethod("getService", String::class.java)
+            val binder = getService.invoke(null, "network_stack") as? android.os.IBinder
+                ?: error("ServiceManager.getService(network_stack) returned null")
+            binder.interfaceDescriptor
+        }
+
+        return CapabilityResult(
+            capability = Capability.NETWORK_STACK_BINDER,
+            isPresent = outcome.isSuccess,
+            detail = outcome.fold(
+                onSuccess = { descriptor -> "network_stack binder found: $descriptor" },
+                onFailure = { failure ->
+                    "${failure.javaClass.simpleName}: ${failure.message}"
+                },
+            ),
+        )
+    }
+
+    private fun checkNetworkStackPermission(): CapabilityResult {
+        val permission = "android.permission.NETWORK_STACK"
+        val granted = context.checkPermission(
+            permission,
+            android.os.Process.myPid(),
+            android.os.Process.myUid(),
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+        return CapabilityResult(
+            capability = Capability.NETWORK_STACK_PERMISSION,
+            isPresent = granted,
+            detail = if (granted) {
+                "$permission granted to uid=${android.os.Process.myUid()}"
+            } else {
+                "$permission NOT granted to uid=${android.os.Process.myUid()}"
+            },
         )
     }
 }

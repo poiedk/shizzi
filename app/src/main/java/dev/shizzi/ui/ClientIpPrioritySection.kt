@@ -23,9 +23,11 @@ fun ClientIpPrioritySection(
     clients: List<ClientLeaseUi>,
     desiredIps: Map<String, String>,
     priority: List<String>,
+    canProvision: Boolean,
     onSave: (String, String) -> Unit,
     onMove: (String, Int) -> Unit,
     onRemove: (String) -> Unit,
+    onProvision: (String, String) -> Unit,
 ) {
     var isOpen by remember { mutableStateOf(false) }
 
@@ -51,7 +53,7 @@ fun ClientIpPrioritySection(
             color = ShizziTheme.colors.onSurface,
         )
         Text(
-            text = "Desired IPs are saved per MAC. Automatic provisioning is not enabled yet.",
+            text = "Desired IPs are saved per MAC. Provisioning restarts the hotspot and is only available when the selected client is the only connected client.",
             style = ShizziTheme.typography.body,
             color = ShizziTheme.colors.onSurfaceMuted,
         )
@@ -108,6 +110,17 @@ fun ClientIpPrioritySection(
                 if (savedAddress.isNotBlank()) {
                     TextButton(onClick = { draftAddress = ""; onRemove(mac) }) { Text("Remove") }
                 }
+
+                val isOnlyClient = clients.size == 1 && clients.single().mac.lowercase() == mac
+                val provisionEnabled =
+                    canProvision && isOnlyClient && isValidIpv4(draftAddress.trim())
+
+                TextButton(
+                    enabled = provisionEnabled,
+                    onClick = { onProvision(mac, draftAddress.trim()) },
+                ) {
+                    Text("Provision")
+                }
             }
                 Spacer(Modifier.height(ShizziTheme.spacing.md))
             }
@@ -130,5 +143,15 @@ private fun ClientIpEmptyState() {
             style = ShizziTheme.typography.body,
             color = ShizziTheme.colors.onSurfaceMuted,
         )
+    }
+}
+
+
+private fun isValidIpv4(value: String): Boolean {
+    val parts = value.split(".")
+    if (parts.size != 4) return false
+    return parts.all { part ->
+        part.isNotBlank() && part.length <= 3 &&
+            part.toIntOrNull()?.let { it in 0..255 } == true
     }
 }

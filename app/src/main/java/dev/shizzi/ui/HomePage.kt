@@ -15,21 +15,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import dev.shizzi.ClientLeaseUi
 import dev.shizzi.SessionUiState
 import dev.shizzi.UiStatus
 import dev.shizzi.ui.theme.HeaderHeight
@@ -51,8 +42,6 @@ private fun buttonState(state: SessionUiState): ConnectButtonState = when {
 @Composable
 fun HomePage(
     state: SessionUiState,
-    clientDesiredIps: Map<String, String>,
-    clientPriority: List<String>,
     actions: HomeActions,
 ) {
     Box(
@@ -65,7 +54,7 @@ fun HomePage(
             onOpenSettings = actions.onOpenSettings,
         )
 
-        HomeBody(state = state, clientDesiredIps = clientDesiredIps, clientPriority = clientPriority, actions = actions)
+        HomeBody(state = state, actions = actions)
 
         Column(
             modifier = Modifier.align(Alignment.BottomCenter),
@@ -91,9 +80,6 @@ data class HomeActions(
     val onCancel: () -> Unit,
     val onOpenSettings: () -> Unit,
     val onOpenEasterEgg: () -> Unit,
-    val onSetClientDesiredIp: (String, String) -> Unit,
-    val onMoveClientPriority: (String, Int) -> Unit,
-    val onRemoveClientDesiredIp: (String) -> Unit,
 )
 
 @Composable
@@ -142,23 +128,14 @@ private fun RiseIn(isVisible: Boolean, content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun HomeBody(
-    state: SessionUiState,
-    clientDesiredIps: Map<String, String>,
-    clientPriority: List<String>,
-    actions: HomeActions,
-) {
+private fun HomeBody(state: SessionUiState, actions: HomeActions) {
     val isStarting = state.status == UiStatus.LOADING
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
             .padding(ScreenPadding)
-            .padding(
-                top = ShizziTheme.spacing.xxxl * 2,
-                bottom = ShizziTheme.spacing.xxxl * 4,
-            ),
+            .padding(top = ShizziTheme.spacing.xxxl * 2),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -172,130 +149,9 @@ private fun HomeBody(
             onClick = actions.onToggle,
         )
 
-        AnimatedVisibility(
-            visible = state.status == UiStatus.CONNECTED && state.clients.isNotEmpty(),
-        ) {
-            PredictableDhcpClients(
-                clients = state.clients,
-                desiredIps = clientDesiredIps,
-                priority = clientPriority,
-                actions = actions,
-            )
-        }
-
         Box(modifier = Modifier.height(ShizziTheme.spacing.xxxl)) {
             RiseIn(isVisible = isStarting) {
                 CancelButton(onClick = actions.onCancel)
-            }
-        }
-    }
-}
-
-@Composable
-private fun PredictableDhcpClients(
-    clients: List<ClientLeaseUi>,
-    desiredIps: Map<String, String>,
-    priority: List<String>,
-    actions: HomeActions,
-) {
-    val orderedClients = clients.sortedWith(
-        compareBy<ClientLeaseUi> { client ->
-            priority.indexOf(client.mac.lowercase()).takeIf { it >= 0 } ?: Int.MAX_VALUE
-        }.thenBy { it.mac },
-    )
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = ShizziTheme.spacing.lg),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(
-            text = "Client IP priority",
-            style = ShizziTheme.typography.caption,
-            color = ShizziTheme.colors.onSurfaceMuted,
-        )
-
-        Text(
-            text = "Desired IPs are saved per MAC; provisioning is not applied automatically yet.",
-            style = ShizziTheme.typography.caption,
-            color = ShizziTheme.colors.onSurfaceMuted,
-        )
-
-        orderedClients.forEach { client ->
-            val normalizedMac = client.mac.lowercase()
-            val savedAddress = desiredIps[normalizedMac].orEmpty()
-            val priorityIndex = priority.indexOf(normalizedMac)
-            var draftAddress by remember(normalizedMac, savedAddress) {
-                mutableStateOf(savedAddress)
-            }
-
-            Spacer(Modifier.height(ShizziTheme.spacing.sm))
-
-            Column(modifier = Modifier.fillMaxWidth()) {
-                val rank = if (priorityIndex >= 0) "#${priorityIndex + 1}  " else ""
-                Text(
-                    text = "${rank}${client.mac}   current ${client.address}",
-                    style = ShizziTheme.typography.log,
-                    color = ShizziTheme.colors.onSurface,
-                )
-
-                OutlinedTextField(
-                    value = draftAddress,
-                    onValueChange = { draftAddress = it },
-                    singleLine = true,
-                    label = { Text("Desired IP") },
-                    placeholder = { Text("172.16.0.10") },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    TextButton(
-                        onClick = {
-                            actions.onSetClientDesiredIp(normalizedMac, draftAddress.trim())
-                        },
-                    ) {
-                        Text("Save")
-                    }
-
-                    TextButton(
-                        enabled = priorityIndex > 0,
-                        onClick = { actions.onMoveClientPriority(normalizedMac, -1) },
-                    ) {
-                        Text("↑")
-                    }
-
-                    TextButton(
-                        enabled = priorityIndex >= 0 && priorityIndex < priority.lastIndex,
-                        onClick = { actions.onMoveClientPriority(normalizedMac, 1) },
-                    ) {
-                        Text("↓")
-                    }
-
-                    if (savedAddress.isNotBlank()) {
-                        TextButton(
-                            onClick = {
-                                draftAddress = ""
-                                actions.onRemoveClientDesiredIp(normalizedMac)
-                            },
-                        ) {
-                            Text("Remove")
-                        }
-                    }
-
-                    Spacer(Modifier.weight(1f))
-
-                    val predicted = client.predictedAddress ?: "—"
-                    val marker = if (client.predictionMatches) " ✓" else ""
-                    Text(
-                        text = "auto $predicted$marker",
-                        style = ShizziTheme.typography.caption,
-                        color = ShizziTheme.colors.onSurfaceMuted,
-                    )
-                }
             }
         }
     }

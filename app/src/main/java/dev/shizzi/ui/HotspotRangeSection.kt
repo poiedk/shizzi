@@ -45,11 +45,14 @@ private fun hotspotRangeDescription(range: HotspotRange): String = when (range) 
 fun HotspotRangeSection(
     selected: HotspotRange,
     customSubnet: String,
+    manualClientIp: String,
     onSelect: (HotspotRange) -> Unit,
     onSetCustomSubnet: (String) -> Unit,
+    onSetManualClientIp: (String) -> Unit,
 ) {
     var isOpen by remember { mutableStateOf(false) }
     var draftSubnet by remember(customSubnet) { mutableStateOf(customSubnet) }
+    var draftClientIp by remember(manualClientIp) { mutableStateOf(manualClientIp) }
 
     SettingsChoice(
         label = SettingsText(
@@ -77,6 +80,7 @@ fun HotspotRangeSection(
                         onSelect(range)
                         if (range == HotspotRange.CUSTOM) {
                             draftSubnet = customSubnet
+                            draftClientIp = manualClientIp
                         } else {
                             isOpen = false
                         }
@@ -122,14 +126,28 @@ fun HotspotRangeSection(
 
             Spacer(Modifier.height(ShizziTheme.spacing.md))
 
+            OutlinedTextField(
+                value = draftClientIp,
+                onValueChange = { draftClientIp = it },
+                singleLine = true,
+                label = { Text("Manual client IP") },
+                supportingText = {
+                    Text("Optional single-client DHCP address, e.g. 172.16.0.10")
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            Spacer(Modifier.height(ShizziTheme.spacing.md))
+
             Button(
                 onClick = {
                     onSetCustomSubnet(draftSubnet.trim())
+                    onSetManualClientIp(draftClientIp.trim())
                     isOpen = false
                 },
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Apply manual subnet")
+                Text("Apply manual hotspot")
             }
         }
 

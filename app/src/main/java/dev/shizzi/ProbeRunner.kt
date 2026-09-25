@@ -28,6 +28,7 @@ class ProbeRunner(private val context: Context) {
         probeSamsungClientDetails(report)
         probeSamsungActiveClients(report)
         probeSamsungClientMutationSurface(report)
+        probeNetworkStackDhcpSurface(report)
         try {
             when {
                 canProceed -> probeNetworkPath(report, attemptTethering, availabilityTimeoutMs)
@@ -454,6 +455,117 @@ class ProbeRunner(private val context: Context) {
             detail = detail,
         )
     }
+    private fun probeNetworkStackDhcpSurface(report: ProbeReportBuilder) {
+        val detail = runCatching {
+            val serviceManager = Class.forName("android.os.ServiceManager")
+            val binderClass = Class.forName("android.os.IBinder")
+            val getService = serviceManager.getMethod("getService", String::class.java)
+            val binder = getService.invoke(null, "network_stack")
+
+            val connectorClass = Class.forName("android.net.INetworkStackConnector")
+            val connectorStub = Class.forName("android.net.INetworkStackConnector\$Stub")
+            val asInterface = connectorStub.getMethod("asInterface", binderClass)
+            val connector = if (binder != null) asInterface.invoke(null, binder) else null
+
+            val dhcpServerClass = runCatching {
+                Class.forName("android.net.dhcp.IDhcpServer")
+            }.getOrNull()
+            val paramsClass = runCatching {
+                Class.forName("android.net.dhcp.DhcpServingParamsParcel")
+            }.getOrNull()
+
+            buildString {
+                append("network_stack binder=")
+                append(if (binder != null) "present" else "null")
+                append('\n')
+                append("connector=")
+                append(connector?.javaClass?.name ?: "null")
+                append('\n')
+
+                append("INetworkStackConnector methods:\n")
+                connectorClass.methods
+                    .filter { it.declaringClass.name.contains("INetworkStackConnector") }
+                    .distinctBy { method ->
+                        method.name + method.parameterTypes.joinToString { it.name }
+                    }
+                    .sortedBy { it.name }
+                    .forEach { method ->
+                        append(method.name)
+                        append('(')
+                        append(method.parameterTypes.joinToString { it.simpleName })
+                        append("): ")
+                        append(method.returnType.simpleName)
+                        append('\n')
+                    }
+
+                append("IDhcpServer=")
+                append(if (dhcpServerClass != null) "present" else "missing")
+                append('\n')
+                dhcpServerClass?.methods
+                    ?.filter { it.declaringClass.name.contains("IDhcpServer") }
+                    ?.distinctBy { method ->
+                        method.name + method.parameterTypes.joinToString { it.name }
+                    }
+                    ?.sortedBy { it.name }
+                    ?.forEach { method ->
+                        append("dhcp.")
+                        append(method.name)
+                        append('(')
+                        append(method.parameterTypes.joinToString { it.simpleName })
+                        append("): ")
+                        append(method.returnType.simpleName)
+                        append('\n')
+                    }
+
+                append("DhcpServingParamsParcel=")
+                append(if (paramsClass != null) "present" else "missing")
+                append('\n')
+                paramsClass?.declaredFields
+                    ?.sortedBy { it.name }
+                    ?.forEach { field ->
+                        append("params.")
+                        append(java.lang.reflect.Modifier.toString(field.modifiers))
+                        append(' ')
+                        append(field.type.simpleName)
+                        append(' ')
+                        append(field.name)
+                        append('\n')
+                    }
+
+                val tetheringManagerClass = Class.forName("android.net.TetheringManager")
+                append("TetheringManager DHCP-like methods:\n")
+                tetheringManagerClass.methods
+                    .filter { method ->
+                        val n = method.name.lowercase()
+                        n.contains("dhcp") || n.contains("lease") || n.contains("client") ||
+                            n.contains("address") || n.contains("tether")
+                    }
+                    .distinctBy { method ->
+                        method.name + method.parameterTypes.joinToString { it.name }
+                    }
+                    .sortedBy { it.name }
+                    .take(NETSTACK_METHOD_LIMIT)
+                    .forEach { method ->
+                        append("tether.")
+                        append(method.name)
+                        append('(')
+                        append(method.parameterTypes.joinToString { it.simpleName })
+                        append("): ")
+                        append(method.returnType.simpleName)
+                        append('\n')
+                    }
+            }
+        }.getOrElse { failure ->
+            "${failure.javaClass.name}: ${failure.message}"
+        }.take(NETSTACK_PROBE_CHARS)
+
+        report.record(
+            id = "Q13",
+            question = QUESTION_NETWORKSTACK_DHCP,
+            outcome = if (detail.startsWith("network_stack binder=present")) ProbeOutcome.PASS else ProbeOutcome.FAIL,
+            detail = detail,
+        )
+    }
     private fun probeIdentityAndPlatform(report: ProbeReportBuilder): Boolean {
         val uid = Process.myUid()
         val isPrivilegedUid = uid == SHELL_UID || uid == ROOT_UID
@@ -853,5 +965,9 @@ class ProbeRunner(private val context: Context) {
             "What does Samsung expose for the currently active hotspot clients?"
         const val QUESTION_SAMSUNG_CLIENT_MUTATION =
             "Can Samsung client-detail objects be written back or mutated through the binder?"
+        const val NETSTACK_METHOD_LIMIT = 200
+        const val NETSTACK_PROBE_CHARS = 20_000
+        const val QUESTION_NETWORKSTACK_DHCP =
+            "What NetworkStack DHCP binder surface is reachable from shell without creating a new server?"
     }
 }

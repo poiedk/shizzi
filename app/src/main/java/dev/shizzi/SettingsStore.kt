@@ -29,6 +29,8 @@ data class Settings(
     val hotspotRange: HotspotRange = HotspotRange.PRIVATE_172,
     val hotspotSubnet: String = "172.16.0.0/24",
     val manualClientIp: String = "",
+    val clientDesiredIps: Map<String, String> = emptyMap(),
+    val clientPriority: List<String> = emptyList(),
 
     val hasCompletedOnboarding: Boolean = false,
 
@@ -94,6 +96,38 @@ class SettingsStore(private val context: Context) {
         context.dataStore.edit { it[MANUAL_CLIENT_IP] = address }
     }
 
+    suspend fun setClientDesiredIp(mac: String, address: String) {
+        val normalizedMac = mac.lowercase()
+        context.dataStore.edit { preferences ->
+            val assignments = parseClientDesiredIps(preferences[CLIENT_DESIRED_IPS]).toMutableMap()
+            if (address.isBlank()) assignments.remove(normalizedMac) else assignments[normalizedMac] = address.trim()
+            preferences[CLIENT_DESIRED_IPS] = serializeClientDesiredIps(assignments)
+
+            val priority = parseClientPriority(preferences[CLIENT_PRIORITY]).toMutableList()
+            priority.remove(normalizedMac)
+            if (address.isNotBlank()) priority += normalizedMac
+            preferences[CLIENT_PRIORITY] = priority.joinToString("\n")
+        }
+    }
+
+    suspend fun moveClientPriority(mac: String, delta: Int) {
+        val normalizedMac = mac.lowercase()
+        context.dataStore.edit { preferences ->
+            val priority = parseClientPriority(preferences[CLIENT_PRIORITY]).toMutableList()
+            val from = priority.indexOf(normalizedMac)
+            if (from < 0) return@edit
+            val to = (from + delta).coerceIn(0, priority.lastIndex)
+            if (to == from) return@edit
+            priority.removeAt(from)
+            priority.add(to, normalizedMac)
+            preferences[CLIENT_PRIORITY] = priority.joinToString("\n")
+        }
+    }
+
+    suspend fun removeClientDesiredIp(mac: String) {
+        setClientDesiredIp(mac, "")
+    }
+
     suspend fun setOnboardingComplete(hasCompleted: Boolean) {
         context.dataStore.edit { it[ONBOARDED] = hasCompleted }
     }
@@ -126,6 +160,8 @@ internal val VPN_MODE = stringPreferencesKey("vpn_mode")
 internal val HOTSPOT_RANGE = stringPreferencesKey("hotspot_range")
 internal val HOTSPOT_SUBNET = stringPreferencesKey("hotspot_subnet")
 internal val MANUAL_CLIENT_IP = stringPreferencesKey("manual_client_ip")
+internal val CLIENT_DESIRED_IPS = stringPreferencesKey("client_desired_ips")
+internal val CLIENT_PRIORITY = stringPreferencesKey("client_priority")
 internal val ONBOARDED = booleanPreferencesKey("onboarded")
 internal val AUTOMATION = booleanPreferencesKey("automation")
 internal val AUTOMATION_TOKEN = stringPreferencesKey("automation_token")
@@ -142,7 +178,33 @@ internal fun toSettings(preferences: Preferences) = Settings(
     hotspotRange = parseHotspotRange(preferences[HOTSPOT_RANGE]),
     hotspotSubnet = preferences[HOTSPOT_SUBNET] ?: "172.16.0.0/24",
     manualClientIp = preferences[MANUAL_CLIENT_IP].orEmpty(),
+    clientDesiredIps = parseClientDesiredIps(preferences[CLIENT_DESIRED_IPS]),
+    clientPriority = parseClientPriority(preferences[CLIENT_PRIORITY]),
     hasCompletedOnboarding = preferences[ONBOARDED] ?: false,
     isAutomationEnabled = preferences[AUTOMATION] ?: false,
     automationToken = preferences[AUTOMATION_TOKEN].orEmpty(),
 )
+
+
+private fun parseClientDesiredIps(raw: String?): Map<String, String> =
+    raw.orEmpty().lineSequence()
+        .mapNotNull { line ->
+            val separator = line.indexOf('=')
+            if (separator <= 0 || separator == line.lastIndex) return@mapNotNull null
+            val mac = line.substring(0, separator).trim().lowercase()
+            val address = line.substring(separator + 1).trim()
+            if (mac.isBlank() || address.isBlank()) null else mac to address
+        }
+        .toMap()
+
+private fun serializeClientDesiredIps(assignments: Map<String, String>): String =
+    assignments.entries
+        .sortedBy { it.key }
+        .joinToString("\n") { (mac, address) -> "$mac=$address" }
+
+private fun parseClientPriority(raw: String?): List<String> =
+    raw.orEmpty().lineSequence()
+        .map { it.trim().lowercase() }
+        .filter { it.isNotBlank() }
+        .distinct()
+        .toList()

@@ -17,9 +17,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import dev.shizzi.ClientLeaseUi
 import dev.shizzi.SessionUiState
 import dev.shizzi.UiStatus
 import dev.shizzi.ui.theme.HeaderHeight
@@ -148,10 +150,43 @@ private fun HomeBody(state: SessionUiState, actions: HomeActions) {
             onClick = actions.onToggle,
         )
 
+        AnimatedVisibility(
+            visible = state.status == UiStatus.CONNECTED && state.clients.isNotEmpty(),
+        ) {
+            PredictableDhcpClients(state.clients)
+        }
+
         Box(modifier = Modifier.height(ShizziTheme.spacing.xxxl)) {
             RiseIn(isVisible = isStarting) {
                 CancelButton(onClick = actions.onCancel)
             }
+        }
+    }
+}
+
+@Composable
+private fun PredictableDhcpClients(clients: List<ClientLeaseUi>) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = ShizziTheme.spacing.lg),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = "Predictable DHCP",
+            style = ShizziTheme.typography.caption,
+            color = ShizziTheme.colors.onSurfaceMuted,
+        )
+
+        clients.forEach { client ->
+            val predicted = client.predictedAddress ?: "—"
+            val marker = if (client.predictionMatches) " ✓" else ""
+
+            Text(
+                text = "${client.mac}  ${client.address}  →  ${predicted}${marker}",
+                style = ShizziTheme.typography.log,
+                color = ShizziTheme.colors.onSurface,
+            )
         }
     }
 }

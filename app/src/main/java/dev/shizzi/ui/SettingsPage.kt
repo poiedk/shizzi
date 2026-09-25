@@ -28,6 +28,7 @@ import androidx.compose.ui.platform.LocalContext
 import dev.shizzi.AppPermission
 import dev.shizzi.PermissionStatus
 import dev.shizzi.HotspotRange
+import dev.shizzi.ClientLeaseUi
 import dev.shizzi.ShizukuState
 import dev.shizzi.VpnMode
 import dev.shizzi.ui.theme.AccentChoice
@@ -59,6 +60,9 @@ data class SettingsState(
     val hotspotRange: HotspotRange,
     val hotspotSubnet: String,
     val manualClientIp: String,
+    val clients: List<ClientLeaseUi>,
+    val clientDesiredIps: Map<String, String>,
+    val clientPriority: List<String>,
     val isRunningDiagnostics: Boolean,
     val automation: AutomationState,
 )
@@ -73,6 +77,9 @@ data class SettingsActions(
     val onSetHotspotRange: (HotspotRange) -> Unit,
     val onSetHotspotSubnet: (String) -> Unit,
     val onSetManualClientIp: (String) -> Unit,
+    val onSetClientDesiredIp: (String, String) -> Unit,
+    val onMoveClientPriority: (String, Int) -> Unit,
+    val onRemoveClientDesiredIp: (String) -> Unit,
     val onOpenLog: () -> Unit,
     val onRunProbes: () -> Unit,
     val onGrantPermission: (AppPermission) -> Unit,
@@ -163,6 +170,15 @@ private fun settingsSections(
             onSelect = actions.onSetHotspotRange,
             onSetCustomSubnet = actions.onSetHotspotSubnet,
             onSetManualClientIp = actions.onSetManualClientIp,
+        )
+
+        ClientIpPrioritySection(
+            clients = state.clients,
+            desiredIps = state.clientDesiredIps,
+            priority = state.clientPriority,
+            onSave = actions.onSetClientDesiredIp,
+            onMove = actions.onMoveClientPriority,
+            onRemove = actions.onRemoveClientDesiredIp,
         )
 
         VpnSection(selected = state.vpnMode, onSelect = actions.onSetVpnMode)

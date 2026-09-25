@@ -24,6 +24,7 @@ class ProbeRunner(private val context: Context) {
         report.recordHiddenApiResolutions(testNetworkApi.resolveAll())
 
         val canProceed = probeIdentityAndPlatform(report)
+        probeSamsungHotspotApi(report)
         try {
             when {
                 canProceed -> probeNetworkPath(report, attemptTethering, availabilityTimeoutMs)
@@ -56,6 +57,78 @@ class ProbeRunner(private val context: Context) {
         )
     }
 
+    private fun probeSamsungHotspotApi(report: ProbeReportBuilder) {
+        if (!Build.MANUFACTURER.equals("samsung", ignoreCase = true)) {
+            report.recordSkip("Q9", QUESTION_SAMSUNG_HOTSPOT, "not a Samsung device")
+            return
+        }
+
+        val detail = buildString {
+            val semClass = runCatching {
+                Class.forName("com.samsung.android.wifi.SemWifiManager")
+            }.getOrNull()
+
+            append("SemWifiManager class=")
+            append(if (semClass != null) "present" else "missing")
+            append('\n')
+
+            val service = runCatching { context.getSystemService("sem_wifi") }.getOrNull()
+            append("sem_wifi service=")
+            append(service?.javaClass?.name ?: "null")
+            append('\n')
+
+            val classes = listOfNotNull(semClass, service?.javaClass).distinctBy { it.name }
+            val keywords = listOf(
+                "ap", "hotspot", "client", "dhcp", "lease", "static",
+                "mac", "tether", "allow", "block",
+            )
+
+            val methods = classes
+                .flatMap { clazz ->
+                    (clazz.methods.asList() + clazz.declaredMethods.asList())
+                        .distinctBy { method ->
+                            method.name + method.parameterTypes.joinToString { it.name }
+                        }
+                        .filter { method ->
+                            val lower = method.name.lowercase()
+                            keywords.any(lower::contains)
+                        }
+                        .map { method ->
+                            buildString {
+                                append(clazz.simpleName)
+                                append('.')
+                                append(method.name)
+                                append('(')
+                                append(method.parameterTypes.joinToString { it.simpleName })
+                                append("): ")
+                                append(method.returnType.simpleName)
+                            }
+                        }
+                }
+                .distinct()
+                .sorted()
+
+            append("candidate methods (")
+            append(methods.size)
+            append("):\n")
+            methods.take(SAMSUNG_METHOD_LIMIT).forEach { method ->
+                append(method)
+                append('\n')
+            }
+            if (methods.size > SAMSUNG_METHOD_LIMIT) {
+                append("... ")
+                append(methods.size - SAMSUNG_METHOD_LIMIT)
+                append(" more")
+            }
+        }.take(SAMSUNG_PROBE_CHARS)
+
+        report.record(
+            id = "Q9",
+            question = QUESTION_SAMSUNG_HOTSPOT,
+            outcome = if (detail.contains("service=null")) ProbeOutcome.FAIL else ProbeOutcome.PASS,
+            detail = detail,
+        )
+    }
     private fun probeIdentityAndPlatform(report: ProbeReportBuilder): Boolean {
         val uid = Process.myUid()
         val isPrivilegedUid = uid == SHELL_UID || uid == ROOT_UID
@@ -442,5 +515,9 @@ class ProbeRunner(private val context: Context) {
                 "(this is what populates UpstreamNetworkMonitor.mNetworkMap)"
 
         const val CALLBACK_WAIT_MS = 5_000L
+        const val SAMSUNG_METHOD_LIMIT = 200
+        const val SAMSUNG_PROBE_CHARS = 16_000
+        const val QUESTION_SAMSUNG_HOTSPOT =
+            "Does Samsung expose private hotspot APIs that could support per-client DHCP control?"
     }
 }

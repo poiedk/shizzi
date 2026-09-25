@@ -27,6 +27,7 @@ class ProbeRunner(private val context: Context) {
         probeSamsungHotspotApi(report)
         probeSamsungClientDetails(report)
         probeSamsungActiveClients(report)
+        probeSamsungClientMutationSurface(report)
         try {
             when {
                 canProceed -> probeNetworkPath(report, attemptTethering, availabilityTimeoutMs)
@@ -367,6 +368,88 @@ class ProbeRunner(private val context: Context) {
         report.record(
             id = "Q11",
             question = QUESTION_SAMSUNG_ACTIVE_CLIENTS,
+            outcome = ProbeOutcome.PASS,
+            detail = detail,
+        )
+    }
+    private fun probeSamsungClientMutationSurface(report: ProbeReportBuilder) {
+        if (!Build.MANUFACTURER.equals("samsung", ignoreCase = true)) {
+            report.recordSkip("Q12", QUESTION_SAMSUNG_CLIENT_MUTATION, "not a Samsung device")
+            return
+        }
+
+        val detail = runCatching {
+            val clientClass = Class.forName("com.samsung.android.wifi.SemWifiApClientDetails")
+            val binderClass = Class.forName("com.samsung.android.wifi.ISemWifiManager")
+
+            buildString {
+                append("constructors:\n")
+                clientClass.declaredConstructors
+                    .sortedBy { it.parameterCount }
+                    .forEach { ctor ->
+                        append(clientClass.simpleName)
+                        append('(')
+                        append(ctor.parameterTypes.joinToString { it.simpleName })
+                        append(")\n")
+                    }
+
+                append("client mutation candidates:\n")
+                (clientClass.methods.asList() + clientClass.declaredMethods.asList())
+                    .distinctBy { method ->
+                        method.name + method.parameterTypes.joinToString { it.name }
+                    }
+                    .filter { method ->
+                        val n = method.name.lowercase()
+                        n.startsWith("set") || n.contains("update") || n.contains("write") ||
+                            n.contains("ip") || n.contains("mac") || n.contains("address")
+                    }
+                    .sortedBy { it.name }
+                    .forEach { method ->
+                        append(method.name)
+                        append('(')
+                        append(method.parameterTypes.joinToString { it.simpleName })
+                        append("): ")
+                        append(method.returnType.simpleName)
+                        append('\n')
+                    }
+
+                append("binder methods mentioning client details:\n")
+                binderClass.methods
+                    .filter { method ->
+                        method.returnType == clientClass ||
+                            method.parameterTypes.any { it == clientClass } ||
+                            method.genericReturnType.typeName.contains("SemWifiApClientDetails") ||
+                            method.genericParameterTypes.any { it.typeName.contains("SemWifiApClientDetails") }
+                    }
+                    .sortedBy { it.name }
+                    .forEach { method ->
+                        append(method.name)
+                        append('(')
+                        append(method.genericParameterTypes.joinToString { it.typeName })
+                        append("): ")
+                        append(method.genericReturnType.typeName)
+                        append('\n')
+                    }
+
+                append("client declared fields:\n")
+                clientClass.declaredFields
+                    .sortedBy { it.name }
+                    .forEach { field ->
+                        append(java.lang.reflect.Modifier.toString(field.modifiers))
+                        append(' ')
+                        append(field.type.simpleName)
+                        append(' ')
+                        append(field.name)
+                        append('\n')
+                    }
+            }
+        }.getOrElse { failure ->
+            "${failure.javaClass.simpleName}: ${failure.message}"
+        }.take(SAMSUNG_PROBE_CHARS)
+
+        report.record(
+            id = "Q12",
+            question = QUESTION_SAMSUNG_CLIENT_MUTATION,
             outcome = ProbeOutcome.PASS,
             detail = detail,
         )
@@ -768,5 +851,7 @@ class ProbeRunner(private val context: Context) {
             "What Samsung client-detail and binder surfaces exist for IP/MAC control?"
         const val QUESTION_SAMSUNG_ACTIVE_CLIENTS =
             "What does Samsung expose for the currently active hotspot clients?"
+        const val QUESTION_SAMSUNG_CLIENT_MUTATION =
+            "Can Samsung client-detail objects be written back or mutated through the binder?"
     }
 }

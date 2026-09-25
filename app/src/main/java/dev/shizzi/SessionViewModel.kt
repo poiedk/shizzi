@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -130,6 +131,42 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch { settingsStore.removeClientDesiredIp(mac) }
     }
 
+    fun provisionClient(mac: String, address: String) {
+        val normalizedMac = mac.lowercase()
+        val requestedAddress = address.trim()
+        val snapshot = state.value
+        val onlyClient = snapshot.clients.singleOrNull()
+
+        if (snapshot.status != UiStatus.CONNECTED ||
+            onlyClient?.mac?.lowercase() != normalizedMac
+        ) {
+            localState.update {
+                it.copy(lastError = "Provisioning requires this to be the only connected client")
+            }
+            return
+        }
+
+        viewModelScope.launch {
+            settingsStore.setClientDesiredIp(normalizedMac, requestedAddress)
+            settingsStore.setManualClientIp(requestedAddress)
+
+            val context = getApplication<Application>()
+            SessionService.stop(context)
+
+            repeat(PROVISION_STOP_POLLS) {
+                if (!SessionService.isRunning) {
+                    SessionService.start(context)
+                    return@launch
+                }
+                delay(PROVISION_STOP_POLL_MS)
+            }
+
+            localState.update {
+                it.copy(lastError = "Provisioning timed out while restarting the hotspot")
+            }
+        }
+    }
+
     fun setTheme(choice: ThemeChoice) {
         viewModelScope.launch { settingsStore.setTheme(choice) }
     }
@@ -220,5 +257,10 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
 
         diagnostics.unbind()
         super.onCleared()
+    }
+
+    private companion object {
+        const val PROVISION_STOP_POLLS = 80
+        const val PROVISION_STOP_POLL_MS = 250L
     }
 }

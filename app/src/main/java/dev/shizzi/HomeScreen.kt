@@ -128,16 +128,11 @@ private fun HomeRoute(context: ScreenContext) {
 
     HomePage(
         state = context.state.session,
-        clientDesiredIps = context.state.settings.clientDesiredIps,
-        clientPriority = context.state.settings.clientPriority,
         actions = HomeActions(
             onToggle = actions.onToggle,
             onCancel = actions.onCancel,
             onOpenSettings = { context.navigation.open(Screen.SETTINGS) },
             onOpenEasterEgg = { context.navigation.open(Screen.EASTER_EGG) },
-            onSetClientDesiredIp = actions.onSetClientDesiredIp,
-            onMoveClientPriority = actions.onMoveClientPriority,
-            onRemoveClientDesiredIp = actions.onRemoveClientDesiredIp,
         ),
     )
 }
@@ -167,6 +162,9 @@ private fun settingsState(state: AppState): SettingsState {
         hotspotRange = settings.hotspotRange,
         hotspotSubnet = settings.hotspotSubnet,
         manualClientIp = settings.manualClientIp,
+        clients = state.session.clients,
+        clientDesiredIps = settings.clientDesiredIps,
+        clientPriority = settings.clientPriority,
         isRunningDiagnostics = state.diagnostics is DiagnosticsState.Running,
         automation = AutomationState(
             isEnabled = settings.isAutomationEnabled,
@@ -188,6 +186,9 @@ private fun settingsActions(context: ScreenContext): SettingsActions {
         onSetHotspotRange = actions.onSetHotspotRange,
         onSetHotspotSubnet = actions.onSetHotspotSubnet,
         onSetManualClientIp = actions.onSetManualClientIp,
+        onSetClientDesiredIp = actions.onSetClientDesiredIp,
+        onMoveClientPriority = actions.onMoveClientPriority,
+        onRemoveClientDesiredIp = actions.onRemoveClientDesiredIp,
         onOpenLog = { context.navigation.open(Screen.LOG) },
         onRunProbes = actions.onRunProbes,
         onGrantPermission = actions.onGrantPermission,

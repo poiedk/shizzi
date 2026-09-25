@@ -135,12 +135,23 @@ class TetherSession(private val context: Context) {
         api.setPreferTestNetworks(true)
     }
 
-    private fun restartDownstream() {
+    private fun restartDownstream(customSubnet: String, manualClientIp: String) {
         val control = DownstreamControl(context)
         control.stopWifiTethering()
 
-        val (didStart, startDetail) = control.startWifiTethering()
+        check(manualClientIp.isBlank() || hotspotRange == HotspotRange.CUSTOM) {
+            "manual client IP requires Manual /24 hotspot range"
+        }
+
+        val (didStart, startDetail) = control.startWifiTethering(
+            customSubnet = customSubnet,
+            manualClientIp = manualClientIp,
+        )
         check(didStart) { "restartDownstream: hotspot did not start ($startDetail)" }
+
+        if (manualClientIp.isNotBlank()) {
+            SessionLog.info("manual DHCP client requested: $manualClientIp")
+        }
 
         awaitDownstreamTethered()
     }

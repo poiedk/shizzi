@@ -114,6 +114,10 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch { settingsStore.setHotspotSubnet(subnet) }
     }
 
+    fun setManualClientIp(address: String) {
+        viewModelScope.launch { settingsStore.setManualClientIp(address) }
+    }
+
     fun setTheme(choice: ThemeChoice) {
         viewModelScope.launch { settingsStore.setTheme(choice) }
     }

@@ -32,6 +32,7 @@ class TetherSession(private val context: Context) {
         mode: VpnMode = VpnMode.AUTO,
         range: HotspotRange = HotspotRange.PRIVATE_172,
         customSubnet: String = "172.16.0.0/24",
+        manualClientIp: String = "",
     ): String {
         if (isActive) return status()
 
@@ -49,7 +50,7 @@ class TetherSession(private val context: Context) {
                 "contract ${TetherService.CONTRACT_VERSION}",
         )
 
-        return runCatching { bringUp(customSubnet) }
+        return runCatching { bringUp(customSubnet, manualClientIp) }
             .getOrElse { failure ->
                 Log.e(TAG, "start failed", failure)
                 SessionLog.error(
@@ -62,7 +63,7 @@ class TetherSession(private val context: Context) {
             }
     }
 
-    private fun bringUp(customSubnet: String): String {
+    private fun bringUp(customSubnet: String, manualClientIp: String): String {
         val group = SessionResources(testNetworkApi, context.connectivityManager())
         resources = group
 
@@ -76,7 +77,7 @@ class TetherSession(private val context: Context) {
         followVpn(group)
 
         preferTestNetworks()
-        restartDownstream()
+        restartDownstream(customSubnet, manualClientIp)
 
         verifyUpstream(name)
         SessionLog.info("upstream verified: $name is sole upstream")

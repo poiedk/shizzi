@@ -1,5 +1,13 @@
 package dev.shizzi
 
+data class HotspotClientLease(
+    val address: String,
+    val mac: String,
+    val predictedAddress: String?,
+) {
+    val isPredictionMatch: Boolean get() = predictedAddress == address
+}
+
 class DownstreamInspector(private val inspector: UpstreamInspector = UpstreamInspector()) {
 
     private var cachedCount = 0
@@ -25,12 +33,26 @@ class DownstreamInspector(private val inspector: UpstreamInspector = UpstreamIns
     fun ipv4Address(): String? {
         val observation = inspector.observe()
         if (observation.didTimeout) return null
+        return parseIpv4Address(observation.rawOutput)
+    }
 
-        val downstreamBlock = observation.rawOutput
-            .substringAfter("mDownstreams:", missingDelimiterValue = "")
-            .substringBefore("mCachedAddresses:", missingDelimiterValue = "")
+    fun clientLeases(): List<HotspotClientLease> {
+        val observation = inspector.observe()
+        if (observation.didTimeout) return emptyList()
 
-        return IPV4_PREFIX_PATTERN.find(downstreamBlock)?.groupValues?.get(1)
+        val hotspotAddress = parseIpv4Address(observation.rawOutput)
+        return CLIENT_PATTERN.findAll(observation.rawOutput)
+            .map { match ->
+                val address = match.groupValues[1]
+                val mac = match.groupValues[2].lowercase()
+                HotspotClientLease(
+                    address = address,
+                    mac = mac,
+                    predictedAddress = predictAddress(mac, hotspotAddress),
+                )
+            }
+            .distinctBy { it.mac }
+            .toList()
     }
 
     fun countDevices(): Int {
@@ -44,6 +66,33 @@ class DownstreamInspector(private val inspector: UpstreamInspector = UpstreamIns
         cachedCount = parseDeviceCount(observation.rawOutput)
         logCountChange(cachedCount)
         return cachedCount
+    }
+
+    private fun parseIpv4Address(output: String): String? {
+        val downstreamBlock = output
+            .substringAfter("mDownstreams:", missingDelimiterValue = "")
+            .substringBefore("mCachedAddresses:", missingDelimiterValue = "")
+
+        return IPV4_PREFIX_PATTERN.find(downstreamBlock)?.groupValues?.get(1)
+    }
+
+    private fun predictAddress(mac: String, hotspotAddress: String?): String? {
+        val cidr = hotspotAddress ?: return null
+        val slash = cidr.lastIndexOf('/')
+        if (slash < 0 || cidr.substring(slash + 1) != "24") return null
+
+        val gateway = cidr.substring(0, slash).split(".")
+        if (gateway.size != 4) return null
+
+        val host = mac.split(":")
+            .takeIf { it.size == 6 }
+            ?.mapNotNull { it.toIntOrNull(16) }
+            ?.takeIf { it.size == 6 }
+            ?.sum()
+            ?.and(0xff)
+            ?: return null
+
+        return "${gateway[0]}.${gateway[1]}.${gateway[2]}.$host"
     }
 
     private fun logCountChange(count: Int) {
@@ -61,16 +110,14 @@ class DownstreamInspector(private val inspector: UpstreamInspector = UpstreamIns
             ?: 0
 
     private companion object {
-
         private val TETHERED_STATE_PATTERN =
             Regex("""^\s*(\w+)\s+-\s+TetheredState\s+-""")
-
         private val CONNECTED_CLIENTS_PATTERN =
             Regex("""getConnectedClientList\(\)\.size\(\):\s*(\d+)""")
-
         private val IPV4_PREFIX_PATTERN =
             Regex("""\b((?:10|172|192)\.\d{1,3}\.\d{1,3}\.\d{1,3}/\d{1,2})\b""")
-
+        private val CLIENT_PATTERN =
+            Regex("""client:\s*/((?:\d{1,3}\.){3}\d{1,3})\s*\(([0-9a-fA-F:]{17})\)""")
         private const val REFRESH_INTERVAL_MS = 10_000L
     }
 }

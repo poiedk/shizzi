@@ -118,6 +118,18 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch { settingsStore.setManualClientIp(address) }
     }
 
+    fun setClientDesiredIp(mac: String, address: String) {
+        viewModelScope.launch { settingsStore.setClientDesiredIp(mac, address) }
+    }
+
+    fun moveClientPriority(mac: String, delta: Int) {
+        viewModelScope.launch { settingsStore.moveClientPriority(mac, delta) }
+    }
+
+    fun removeClientDesiredIp(mac: String) {
+        viewModelScope.launch { settingsStore.removeClientDesiredIp(mac) }
+    }
+
     fun setTheme(choice: ThemeChoice) {
         viewModelScope.launch { settingsStore.setTheme(choice) }
     }

@@ -15,6 +15,13 @@ import rikka.shizuku.Shizuku
 
 enum class UiStatus { READY, LOADING, CONNECTED, ERROR }
 
+data class ClientLeaseUi(
+    val address: String,
+    val mac: String,
+    val predictedAddress: String?,
+    val predictionMatches: Boolean,
+)
+
 data class SessionUiState(
     val shizukuState: ShizukuState = ShizukuState.NotRunning,
     val status: UiStatus = UiStatus.READY,
@@ -27,6 +34,7 @@ data class SessionUiState(
 
     val clientCount: Int = 0,
     val hotspotAddress: String = "",
+    val clients: List<ClientLeaseUi> = emptyList(),
 
     val traffic: Traffic = Traffic(),
 ) {
@@ -44,6 +52,7 @@ fun SessionUiState.asStopped(): SessionUiState = copy(
     isVpnBypassed = false,
     clientCount = 0,
     hotspotAddress = "",
+    clients = emptyList(),
     traffic = Traffic(),
 )
 
@@ -60,6 +69,7 @@ fun SessionUiState.applyOutcome(outcome: Result<String>): SessionUiState {
             isVpnBypassed = false,
             clientCount = 0,
             hotspotAddress = "",
+            clients = emptyList(),
             traffic = Traffic(),
         )
     }
@@ -67,6 +77,24 @@ fun SessionUiState.applyOutcome(outcome: Result<String>): SessionUiState {
     val parsed = runCatching { JSONObject(outcome.getOrDefault("{}")) }.getOrNull()
     val sessionState = parsed?.optString("state").orEmpty()
     val sessionDetail = parsed?.optString("detail").orEmpty()
+
+    val parsedClients = buildList {
+        val array = parsed?.optJSONArray("clients") ?: return@buildList
+        for (index in 0 until array.length()) {
+            val client = array.optJSONObject(index) ?: continue
+            val predicted = client.optString("predictedAddress")
+                .takeIf { it.isNotBlank() && it != "null" }
+
+            add(
+                ClientLeaseUi(
+                    address = client.optString("address"),
+                    mac = client.optString("mac"),
+                    predictedAddress = predicted,
+                    predictionMatches = client.optBoolean("predictionMatches"),
+                ),
+            )
+        }
+    }
 
     return copy(
         isBusy = false,
@@ -80,6 +108,7 @@ fun SessionUiState.applyOutcome(outcome: Result<String>): SessionUiState {
         clientCount = parsed?.optInt("clientCount") ?: 0,
         hotspotAddress = parsed?.optString("hotspotAddress").orEmpty()
             .takeIf { it != "null" }.orEmpty(),
+        clients = parsedClients,
         traffic = Traffic(
             up = parsed?.optLong("bytesUp") ?: 0,
             down = parsed?.optLong("bytesDown") ?: 0,

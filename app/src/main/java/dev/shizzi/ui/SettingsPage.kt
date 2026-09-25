@@ -80,6 +80,7 @@ data class SettingsActions(
     val onSetClientDesiredIp: (String, String) -> Unit,
     val onMoveClientPriority: (String, Int) -> Unit,
     val onRemoveClientDesiredIp: (String) -> Unit,
+    val onProvisionClient: (String, String) -> Unit,
     val onOpenLog: () -> Unit,
     val onRunProbes: () -> Unit,
     val onGrantPermission: (AppPermission) -> Unit,
@@ -176,9 +177,11 @@ private fun settingsSections(
             clients = state.clients,
             desiredIps = state.clientDesiredIps,
             priority = state.clientPriority,
+            canProvision = state.hotspotRange == HotspotRange.CUSTOM,
             onSave = actions.onSetClientDesiredIp,
             onMove = actions.onMoveClientPriority,
             onRemove = actions.onRemoveClientDesiredIp,
+            onProvision = actions.onProvisionClient,
         )
 
         VpnSection(selected = state.vpnMode, onSelect = actions.onSetVpnMode)

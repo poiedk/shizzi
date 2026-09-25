@@ -242,10 +242,11 @@ class TetherClient {
         vpnMode: VpnMode,
         hotspotRange: HotspotRange,
         hotspotSubnet: String,
+        manualClientIp: String,
     ): String = withContext(Dispatchers.IO) {
         val bound = service()
         verifyContract(bound)
-        bound.start(logging, vpnMode.name, hotspotRange.name, hotspotSubnet)
+        bound.start(logging, vpnMode.name, hotspotRange.name, hotspotSubnet, manualClientIp)
     }
 
     fun setLogging(enabled: Boolean) {

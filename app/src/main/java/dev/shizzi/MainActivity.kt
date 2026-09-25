@@ -104,6 +104,7 @@ class MainActivity : ComponentActivity() {
                             onSetVpnMode = viewModel::setVpnMode,
                             onSetHotspotRange = viewModel::setHotspotRange,
                             onSetHotspotSubnet = viewModel::setHotspotSubnet,
+                            onSetManualClientIp = viewModel::setManualClientIp,
                             onRunProbes = viewModel::runProbes,
                             onDismissDiagnostics = viewModel::dismissDiagnostics,
                             onClearLog = viewModel::clearLog,

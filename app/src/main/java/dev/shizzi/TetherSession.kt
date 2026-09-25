@@ -3,6 +3,7 @@ package dev.shizzi
 import android.content.Context
 import android.os.Build
 import android.util.Log
+import org.json.JSONArray
 import org.json.JSONObject
 
 enum class SessionState { IDLE, STARTING, ACTIVE, ERROR }
@@ -242,6 +243,23 @@ class TetherSession(private val context: Context) {
         put("bytesDown", traffic.down)
         put("clientCount", if (isActive) downstream.countDevices() else 0)
         put("hotspotAddress", if (isActive) downstream.ipv4Address() ?: JSONObject.NULL else JSONObject.NULL)
+
+        val clients = if (isActive) downstream.clientLeases() else emptyList()
+        put(
+            "clients",
+            JSONArray().apply {
+                clients.forEach { client ->
+                    put(
+                        JSONObject().apply {
+                            put("address", client.address)
+                            put("mac", client.mac)
+                            put("predictedAddress", client.predictedAddress ?: JSONObject.NULL)
+                            put("predictionMatches", client.isPredictionMatch)
+                        },
+                    )
+                }
+            },
+        )
     }.toString()
 
     private fun isVpnBypassed(): Boolean {

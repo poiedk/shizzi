@@ -91,6 +91,7 @@ class SessionService : Service() {
                         settings.vpnMode,
                         settings.hotspotRange,
                         settings.hotspotSubnet,
+                        settings.manualClientIp,
                     )
                 }
             }

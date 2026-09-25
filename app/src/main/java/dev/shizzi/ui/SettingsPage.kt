@@ -58,6 +58,7 @@ data class SettingsState(
     val vpnMode: VpnMode,
     val hotspotRange: HotspotRange,
     val hotspotSubnet: String,
+    val manualClientIp: String,
     val isRunningDiagnostics: Boolean,
     val automation: AutomationState,
 )
@@ -71,6 +72,7 @@ data class SettingsActions(
     val onSetVpnMode: (VpnMode) -> Unit,
     val onSetHotspotRange: (HotspotRange) -> Unit,
     val onSetHotspotSubnet: (String) -> Unit,
+    val onSetManualClientIp: (String) -> Unit,
     val onOpenLog: () -> Unit,
     val onRunProbes: () -> Unit,
     val onGrantPermission: (AppPermission) -> Unit,
@@ -157,8 +159,10 @@ private fun settingsSections(
         HotspotRangeSection(
             selected = state.hotspotRange,
             customSubnet = state.hotspotSubnet,
+            manualClientIp = state.manualClientIp,
             onSelect = actions.onSetHotspotRange,
             onSetCustomSubnet = actions.onSetHotspotSubnet,
+            onSetManualClientIp = actions.onSetManualClientIp,
         )
 
         VpnSection(selected = state.vpnMode, onSelect = actions.onSetVpnMode)

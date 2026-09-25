@@ -25,6 +25,7 @@ class ProbeRunner(private val context: Context) {
 
         val canProceed = probeIdentityAndPlatform(report)
         probeSamsungHotspotApi(report)
+        probeSamsungClientDetails(report)
         try {
             when {
                 canProceed -> probeNetworkPath(report, attemptTethering, availabilityTimeoutMs)
@@ -126,6 +127,121 @@ class ProbeRunner(private val context: Context) {
             id = "Q9",
             question = QUESTION_SAMSUNG_HOTSPOT,
             outcome = if (detail.contains("service=null")) ProbeOutcome.FAIL else ProbeOutcome.PASS,
+            detail = detail,
+        )
+    }
+    private fun probeSamsungClientDetails(report: ProbeReportBuilder) {
+        if (!Build.MANUFACTURER.equals("samsung", ignoreCase = true)) {
+            report.recordSkip("Q10", QUESTION_SAMSUNG_CLIENT_DETAILS, "not a Samsung device")
+            return
+        }
+
+        val detail = runCatching {
+            val service = context.getSystemService("sem_wifi")
+                ?: error("sem_wifi service unavailable")
+            val clazz = service.javaClass
+
+            val listMethod = clazz.methods.firstOrNull {
+                it.name == "getWifiApStaListDetail" && it.parameterCount == 0
+            }
+            val list = listMethod?.invoke(service) as? List<*>
+
+            buildString {
+                append("getWifiApStaListDetail=")
+                append(if (listMethod != null) "present" else "missing")
+                append('\n')
+                append("items=")
+                append(list?.size ?: -1)
+                append('\n')
+
+                val itemClasses = list.orEmpty()
+                    .filterNotNull()
+                    .map { it.javaClass }
+                    .distinctBy { it.name }
+
+                itemClasses.forEach { itemClass ->
+                    append("itemClass=")
+                    append(itemClass.name)
+                    append('\n')
+
+                    val fields = itemClass.declaredFields
+                        .map { field -> "${field.type.simpleName} ${field.name}" }
+                        .sorted()
+                    append("fields (${fields.size}):\n")
+                    fields.take(SAMSUNG_DETAIL_MEMBER_LIMIT).forEach { field ->
+                        append(field)
+                        append('\n')
+                    }
+
+                    val methods = (itemClass.methods.asList() + itemClass.declaredMethods.asList())
+                        .distinctBy { method ->
+                            method.name + method.parameterTypes.joinToString { it.name }
+                        }
+                        .filter { method ->
+                            val lower = method.name.lowercase()
+                            listOf("ip", "mac", "client", "device", "name", "address", "sta")
+                                .any(lower::contains)
+                        }
+                        .map { method ->
+                            buildString {
+                                append(method.name)
+                                append('(')
+                                append(method.parameterTypes.joinToString { it.simpleName })
+                                append("): ")
+                                append(method.returnType.simpleName)
+                            }
+                        }
+                        .sorted()
+                    append("methods (${methods.size}):\n")
+                    methods.take(SAMSUNG_DETAIL_MEMBER_LIMIT).forEach { method ->
+                        append(method)
+                        append('\n')
+                    }
+                }
+
+                list.orEmpty().take(SAMSUNG_DETAIL_ITEM_LIMIT).forEachIndexed { index, item ->
+                    append("item[")
+                    append(index)
+                    append("]=")
+                    append(item)
+                    append('\n')
+                }
+
+                val binderClass = runCatching {
+                    Class.forName("com.samsung.android.wifi.ISemWifiManager")
+                }.getOrNull()
+                append("ISemWifiManager=")
+                append(if (binderClass != null) "present" else "missing")
+                append('\n')
+                binderClass?.methods
+                    ?.filter { method ->
+                        val lower = method.name.lowercase()
+                        listOf("dhcp", "lease", "client", "ip", "static", "address", "sta")
+                            .any(lower::contains)
+                    }
+                    ?.distinctBy { method ->
+                        method.name + method.parameterTypes.joinToString { it.name }
+                    }
+                    ?.sortedBy { it.name }
+                    ?.take(SAMSUNG_BINDER_METHOD_LIMIT)
+                    ?.forEach { method ->
+                        append("binder.")
+                        append(method.name)
+                        append('(')
+                        append(method.parameterTypes.joinToString { it.simpleName })
+                        append("): ")
+                        append(method.returnType.simpleName)
+                        append('\n')
+                    }
+            }
+        }.getOrElse { failure ->
+            "${failure.javaClass.simpleName}: ${failure.message}"
+        }.take(SAMSUNG_PROBE_CHARS)
+
+        report.record(
+            id = "Q10",
+            question = QUESTION_SAMSUNG_CLIENT_DETAILS,
+            outcome = if (detail.startsWith("getWifiApStaListDetail=")) ProbeOutcome.PASS else ProbeOutcome.FAIL,
             detail = detail,
         )
     }
@@ -517,7 +633,12 @@ class ProbeRunner(private val context: Context) {
         const val CALLBACK_WAIT_MS = 5_000L
         const val SAMSUNG_METHOD_LIMIT = 200
         const val SAMSUNG_PROBE_CHARS = 16_000
+        const val SAMSUNG_DETAIL_MEMBER_LIMIT = 100
+        const val SAMSUNG_DETAIL_ITEM_LIMIT = 10
+        const val SAMSUNG_BINDER_METHOD_LIMIT = 200
         const val QUESTION_SAMSUNG_HOTSPOT =
             "Does Samsung expose private hotspot APIs that could support per-client DHCP control?"
+        const val QUESTION_SAMSUNG_CLIENT_DETAILS =
+            "What Samsung client-detail and binder surfaces exist for IP/MAC control?"
     }
 }

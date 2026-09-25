@@ -46,6 +46,9 @@ data class AppActions(
     val onSetHotspotRange: (HotspotRange) -> Unit,
     val onSetHotspotSubnet: (String) -> Unit,
     val onSetManualClientIp: (String) -> Unit,
+    val onSetClientDesiredIp: (String, String) -> Unit,
+    val onMoveClientPriority: (String, Int) -> Unit,
+    val onRemoveClientDesiredIp: (String) -> Unit,
     val onRunProbes: () -> Unit,
     val onDismissDiagnostics: () -> Unit,
     val onClearLog: (onCleared: (String?) -> Unit) -> Unit,
@@ -125,11 +128,16 @@ private fun HomeRoute(context: ScreenContext) {
 
     HomePage(
         state = context.state.session,
+        clientDesiredIps = context.state.settings.clientDesiredIps,
+        clientPriority = context.state.settings.clientPriority,
         actions = HomeActions(
             onToggle = actions.onToggle,
             onCancel = actions.onCancel,
             onOpenSettings = { context.navigation.open(Screen.SETTINGS) },
             onOpenEasterEgg = { context.navigation.open(Screen.EASTER_EGG) },
+            onSetClientDesiredIp = actions.onSetClientDesiredIp,
+            onMoveClientPriority = actions.onMoveClientPriority,
+            onRemoveClientDesiredIp = actions.onRemoveClientDesiredIp,
         ),
     )
 }

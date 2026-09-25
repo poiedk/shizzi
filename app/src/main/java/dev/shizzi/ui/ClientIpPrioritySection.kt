@@ -27,30 +27,49 @@ fun ClientIpPrioritySection(
     onMove: (String, Int) -> Unit,
     onRemove: (String) -> Unit,
 ) {
-    val orderedClients = clients.sortedWith(
+    var isOpen by remember { mutableStateOf(false) }
+
+    SettingsChoice(
+        label = SettingsText(
+            title = "Client IP priority",
+            subtitle = "Set desired IPs per connected client",
+        ),
+        value = when {
+            desiredIps.isNotEmpty() -> "${desiredIps.size} saved"
+            clients.isNotEmpty() -> "${clients.size} connected"
+            else -> "No clients"
+        },
+        onClick = { isOpen = true },
+    )
+
+    if (!isOpen) return
+
+    ThemedBottomSheet(onDismiss = { isOpen = false }) {
+        Text(
+            text = "Client IP priority",
+            style = ShizziTheme.typography.heading,
+            color = ShizziTheme.colors.onSurface,
+        )
+        Text(
+            text = "Desired IPs are saved per MAC. Automatic provisioning is not enabled yet.",
+            style = ShizziTheme.typography.body,
+            color = ShizziTheme.colors.onSurfaceMuted,
+        )
+        Spacer(Modifier.height(ShizziTheme.spacing.md))
+
+        val orderedClients = clients.sortedWith(
         compareBy<ClientLeaseUi> { client ->
             priority.indexOf(client.mac.lowercase()).takeIf { it >= 0 } ?: Int.MAX_VALUE
         }.thenBy { it.mac },
-    )
+        )
 
-    if (orderedClients.isEmpty()) {
-        ClientIpEmptyState()
-        return
-    }
+        if (orderedClients.isEmpty()) {
+            ClientIpEmptyState()
+            Spacer(Modifier.height(ShizziTheme.spacing.lg))
+            return@ThemedBottomSheet
+        }
 
-    Text(
-        text = "Client IP priority",
-        style = ShizziTheme.typography.subheading,
-        color = ShizziTheme.colors.onSurface,
-    )
-    Text(
-        text = "Desired IPs are saved per MAC. Automatic provisioning is not enabled yet.",
-        style = ShizziTheme.typography.body,
-        color = ShizziTheme.colors.onSurfaceMuted,
-    )
-    Spacer(Modifier.height(ShizziTheme.spacing.sm))
-
-    orderedClients.forEach { client ->
+        orderedClients.forEach { client ->
         val mac = client.mac.lowercase()
         val savedAddress = desiredIps[mac].orEmpty()
         val priorityIndex = priority.indexOf(mac)
@@ -90,8 +109,11 @@ fun ClientIpPrioritySection(
                     TextButton(onClick = { draftAddress = ""; onRemove(mac) }) { Text("Remove") }
                 }
             }
-            Spacer(Modifier.height(ShizziTheme.spacing.md))
+                Spacer(Modifier.height(ShizziTheme.spacing.md))
+            }
         }
+
+        Spacer(Modifier.height(ShizziTheme.spacing.lg))
     }
 }
 

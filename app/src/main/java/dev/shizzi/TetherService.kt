@@ -31,6 +31,7 @@ class TetherService : ITetherService.Stub {
         vpnMode: String?,
         hotspotRange: String?,
         hotspotSubnet: String?,
+        manualClientIp: String?,
     ): String {
         SessionLog.setEnabled(logging)
         return runCatching {
@@ -38,6 +39,7 @@ class TetherService : ITetherService.Stub {
                 parseVpnMode(vpnMode),
                 parseHotspotRange(hotspotRange),
                 hotspotSubnet.orEmpty(),
+                manualClientIp.orEmpty(),
             )
         }.getOrElse { failure -> sessionError("start", failure) }
     }

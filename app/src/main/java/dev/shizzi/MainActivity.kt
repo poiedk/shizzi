@@ -108,6 +108,7 @@ class MainActivity : ComponentActivity() {
                             onSetClientDesiredIp = viewModel::setClientDesiredIp,
                             onMoveClientPriority = viewModel::moveClientPriority,
                             onRemoveClientDesiredIp = viewModel::removeClientDesiredIp,
+                            onProvisionClient = viewModel::provisionClient,
                             onRunProbes = viewModel::runProbes,
                             onDismissDiagnostics = viewModel::dismissDiagnostics,
                             onClearLog = viewModel::clearLog,

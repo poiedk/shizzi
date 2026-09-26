@@ -29,6 +29,7 @@ class ProbeRunner(private val context: Context) {
         probeSamsungActiveClients(report)
         probeSamsungClientMutationSurface(report)
         probeNetworkStackDhcpSurface(report)
+        probeRawNetworkStackBinder(report)
         try {
             when {
                 canProceed -> probeNetworkPath(report, attemptTethering, availabilityTimeoutMs)
@@ -566,6 +567,83 @@ class ProbeRunner(private val context: Context) {
             detail = detail,
         )
     }
+    private fun probeRawNetworkStackBinder(report: ProbeReportBuilder) {
+        val detail = runCatching {
+            val serviceManager = Class.forName("android.os.ServiceManager")
+            val getService = serviceManager.getMethod("getService", String::class.java)
+            val binder = getService.invoke(null, "network_stack")
+                ?: error("network_stack service returned null")
+
+            val descriptor = runCatching {
+                binder.javaClass.getMethod("getInterfaceDescriptor").invoke(binder)?.toString()
+            }.getOrNull()
+
+            val ping = runCatching {
+                binder.javaClass.getMethod("pingBinder").invoke(binder)?.toString()
+            }.getOrNull()
+
+            val alive = runCatching {
+                binder.javaClass.getMethod("isBinderAlive").invoke(binder)?.toString()
+            }.getOrNull()
+
+            val classCandidates = listOf(
+                "android.net.INetworkStackConnector",
+                "android.net.INetworkStackConnector\$Stub",
+                "android.net.dhcp.IDhcpServer",
+                "android.net.dhcp.IDhcpServer\$Stub",
+                "android.net.dhcp.DhcpServingParamsParcel",
+                "android.net.networkstack.aidl.INetworkStackConnector",
+            )
+
+            buildString {
+                append("binderClass=")
+                append(binder.javaClass.name)
+                append('\n')
+                append("descriptor=")
+                append(descriptor)
+                append('\n')
+                append("pingBinder=")
+                append(ping)
+                append('\n')
+                append("isBinderAlive=")
+                append(alive)
+                append('\n')
+                append("class candidates:\n")
+                classCandidates.forEach { name ->
+                    val result = runCatching { Class.forName(name) }
+                    append(name)
+                    append("=")
+                    append(if (result.isSuccess) "present" else "missing")
+                    result.exceptionOrNull()?.let {
+                        append(" (")
+                        append(it.javaClass.simpleName)
+                        append(")")
+                    }
+                    append('\n')
+                }
+                append("binder methods:\n")
+                binder.javaClass.methods
+                    .sortedBy { it.name }
+                    .forEach { method ->
+                        append(method.name)
+                        append('(')
+                        append(method.parameterTypes.joinToString { it.simpleName })
+                        append("): ")
+                        append(method.returnType.simpleName)
+                        append('\n')
+                    }
+            }
+        }.getOrElse { failure ->
+            "${failure.javaClass.name}: ${failure.message}"
+        }.take(NETSTACK_PROBE_CHARS)
+
+        report.record(
+            id = "Q14",
+            question = QUESTION_RAW_NETWORKSTACK_BINDER,
+            outcome = if (detail.contains("descriptor=")) ProbeOutcome.PASS else ProbeOutcome.FAIL,
+            detail = detail,
+        )
+    }
     private fun probeIdentityAndPlatform(report: ProbeReportBuilder): Boolean {
         val uid = Process.myUid()
         val isPrivilegedUid = uid == SHELL_UID || uid == ROOT_UID
@@ -969,5 +1047,7 @@ class ProbeRunner(private val context: Context) {
         const val NETSTACK_PROBE_CHARS = 20_000
         const val QUESTION_NETWORKSTACK_DHCP =
             "What NetworkStack DHCP binder surface is reachable from shell without creating a new server?"
+        const val QUESTION_RAW_NETWORKSTACK_BINDER =
+            "What raw network_stack Binder endpoint is reachable when hidden AIDL classes are absent from the app classloader?"
     }
 }
